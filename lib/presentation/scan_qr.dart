@@ -1,20 +1,16 @@
-// ignore_for_file: deprecated_member_use
-
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:qrcode/presentation/success_screen.dart';
 
 class QRViewExample extends StatefulWidget {
-  const QRViewExample({super.key});
+  const QRViewExample({Key? key}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _QRViewExampleState();
 }
 
 class _QRViewExampleState extends State<QRViewExample> {
-  Barcode? result;
   QRViewController? controller;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
 
@@ -40,10 +36,7 @@ class _QRViewExampleState extends State<QRViewExample> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: <Widget>[
-                  if (result != null)
-                    Text('Data: ${result!.code}')
-                  else
-                    const Text('Scan a code'),
+                  const Text('Scan a QR code'),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -51,16 +44,12 @@ class _QRViewExampleState extends State<QRViewExample> {
                       Container(
                         margin: const EdgeInsets.all(8),
                         child: ElevatedButton(
-                            onPressed: () async {
-                              await controller?.toggleFlash();
-                              setState(() {});
-                            },
-                            child: FutureBuilder(
-                              future: controller?.getFlashStatus(),
-                              builder: (context, snapshot) {
-                                return const Text('Flash');
-                              },
-                            )),
+                          onPressed: () async {
+                            await controller?.toggleFlash();
+                            setState(() {});
+                          },
+                          child: const Text('Flash'),
+                        ),
                       ),
                       Container(
                         margin: const EdgeInsets.all(8),
@@ -69,16 +58,7 @@ class _QRViewExampleState extends State<QRViewExample> {
                             await controller?.flipCamera();
                             setState(() {});
                           },
-                          child: FutureBuilder(
-                            future: controller?.getCameraInfo(),
-                            builder: (context, snapshot) {
-                              if (snapshot.data != null) {
-                                return const Text('Flip camera');
-                              } else {
-                                return const Text('loading');
-                              }
-                            },
-                          ),
+                          child: const Text('Flip camera'),
                         ),
                       ),
                     ],
@@ -101,52 +81,73 @@ class _QRViewExampleState extends State<QRViewExample> {
       key: qrKey,
       onQRViewCreated: onQRViewCreated,
       overlay: QrScannerOverlayShape(
-          borderColor: Colors.red,
-          borderRadius: 10,
-          borderLength: 30,
-          borderWidth: 10,
-          cutOutSize: scanArea),
+        borderColor: Colors.red,
+        borderRadius: 10,
+        borderLength: 30,
+        borderWidth: 10,
+        cutOutSize: scanArea,
+      ),
       onPermissionSet: (ctrl, p) => onPermissionSet(context, ctrl, p),
     );
   }
 
   void onQRViewCreated(QRViewController controller) {
-    setState(() {
-      this.controller = controller;
-    });
+    this.controller = controller;
+
     controller.scannedDataStream.listen((scanData) {
-      setState(() {
-        result = scanData;
-      });
       if (scanData.code != null) {
+        String scannedCode = scanData.code!;
+        if (scannedCode == 'Reubro International') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SuccessScreen(
+                data: scannedCode,
+              ),
+            ),
+          );
+        } else if (scannedCode == 'Machine Test') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SuccessScreen(data: scannedCode),
+            ),
+          );
+        } else {
+          // Invalid QR code data
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Invalid QR Code'),
+                content: const Text(
+                    'The scanned QR code does not match any predefined condition.'),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      } else {
         showDialog(
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
-              title: const Text('Scan Successful'),
-              content: SingleChildScrollView(
-                child: ListBody(
-                  children: <Widget>[
-                    Text('Barcode Type: ${describeEnum(scanData.format)}'),
-                    Text('Data: ${scanData.code}'),
-                  ],
-                ),
-              ),
+              title: const Text('Scan Error'),
+              content:
+                  const Text('Invalid QR code or failed scanning attempt.'),
               actions: <Widget>[
                 TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
                   child: const Text('OK'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-                TextButton(
-                  child: const Text('Open Link'),
-                  onPressed: () {
-                    launchURL(
-                      scanData.code!,
-                    );
-                    Navigator.of(context).pop();
-                  },
                 ),
               ],
             );
@@ -154,19 +155,6 @@ class _QRViewExampleState extends State<QRViewExample> {
         );
       }
     });
-  }
-
-  void launchURL(String url) async {
-    if (await canLaunch(url)) {
-      await launch(
-        url,
-        forceSafariVC: true,
-        forceWebView: true,
-        enableJavaScript: true,
-      );
-    } else {
-      throw 'Could not launch $url';
-    }
   }
 
   void onPermissionSet(BuildContext context, QRViewController ctrl, bool p) {

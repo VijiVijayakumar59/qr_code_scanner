@@ -8,6 +8,8 @@ class QrCodeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
         body: Center(
+
+          
       child: SizedBox(
         width: 500,
         height: 500,
